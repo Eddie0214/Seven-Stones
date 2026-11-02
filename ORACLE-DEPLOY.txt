@@ -1,0 +1,287 @@
+SEVEN STONES — ORACLE CLOUD DEPLOYMENT
+======================================
+
+This guide targets an Oracle Cloud Infrastructure (OCI) Always Free or paid
+Ubuntu VM. Oracle's free-tier availability depends on your account, region, and
+current capacity; check the OCI console before promising a free deployment.
+
+The stack is:
+
+  Internet -> Caddy (ports 80/443, automatic HTTPS) -> app:8787 (private)
+                 app database -> Docker volume seven-stones-data
+
+Do not publish port 8787 directly to the internet.
+
+
+1. CREATE THE VM
+----------------
+- Ubuntu 24.04 (or a current Ubuntu LTS image).
+- A shape with at least 1 GB RAM is recommended. 512 MB may work for a tiny
+  private test but leaves little headroom for Node.js and SQLite.
+- Assign a public IPv4 address.
+- Keep the SSH key. You will need it for the first login.
+
+
+2. OPEN THE NETWORK
+-------------------
+In OCI: Networking -> Virtual Cloud Networks -> your VCN -> Security Lists
+(or Network Security Groups). Allow inbound:
+
+  TCP 22    from your own IP only, if possible
+  TCP 80    from 0.0.0.0/0
+  TCP 443   from 0.0.0.0/0
+
+On the VM, also allow HTTP/HTTPS through the host firewall:
+
+  sudo ufw allow OpenSSH
+  sudo ufw allow 80/tcp
+  sudo ufw allow 443/tcp
+  sudo ufw enable
+
+If your image uses firewalld instead:
+
+  sudo firewall-cmd --permanent --add-service=http
+  sudo firewall-cmd --permanent --add-service=https
+  sudo firewall-cmd --reload
+
+Verify from the OCI console and from an outside network. A closed port at either
+layer will prevent Caddy from obtaining a certificate.
+
+
+3. INSTALL DOCKER
+-----------------
+Log in to the VM, then follow Docker's official Ubuntu repository instructions
+for the current release. A concise version:
+
+  sudo apt-get update
+  sudo apt-get install -y ca-certificates curl
+  sudo install -m 0755 -d /etc/apt/keyrings
+  sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+    -o /etc/apt/keyrings/docker.asc
+  sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+  echo "deb [arch=$(dpkg --print-architecture) \
+  signed-by=/etc/apt/keyrings/docker.asc] \
+  https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+    sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+  sudo apt-get update
+  sudo apt-get install -y docker-ce docker-ce-cli containerd.io \
+    docker-buildx-plugin docker-compose-plugin
+
+  sudo systemctl enable --now docker
+  sudo usermod -aG docker "$USER"
+
+Log out and back in so the docker group applies. Confirm:
+
+  docker --version
+  docker compose version
+
+
+4. GET THE PROJECT ONTO THE VM
+------------------------------
+Copy this project directory to the VM, for example:
+
+  scp -r seven-stones ubuntu@YOUR_SERVER_IP:/home/ubuntu/
+
+Then:
+
+  sudo mkdir -p /opt/seven-stones
+  sudo chown "$USER":"$USER" /opt/seven-stones
+  cp -R /home/ubuntu/seven-stones/. /opt/seven-stones/
+  cd /opt/seven-stones
+
+If you use a private Git repository instead, clone it into /opt/seven-stones.
+
+Never copy a local development database or a real .env into a public repository.
+
+
+5. CONFIGURE DNS
+----------------
+Create an A record for your hostname, for example:
+
+  stones.example.com  A  YOUR_SERVER_PUBLIC_IP
+
+Wait for DNS to resolve before starting Caddy:
+
+  getent hosts stones.example.com
+
+Caddy cannot issue a certificate until the name points at this VM and ports
+80/443 are reachable.
+
+
+6. CONFIGURE ENVIRONMENT
+------------------------
+  cp .env.oracle.example .env
+  nano .env
+
+Set at minimum:
+
+  DOMAIN=stones.example.com
+  COOKIE_SECURE=1
+  DB_PATH=/app/data/league.sqlite
+
+Leave GOOGLE_CLIENT_ID empty unless Google sign-in is configured. If you set
+it, add the exact HTTPS origin to Google Cloud Console:
+
+  https://stones.example.com
+
+Restrict permissions:
+
+  chmod 600 .env
+
+
+7. BUILD AND START
+------------------
+  cd /opt/seven-stones
+  docker compose -f compose.yaml -f compose.oracle.yaml up -d --build
+
+Check status:
+
+  docker compose -f compose.yaml -f compose.oracle.yaml ps
+  docker compose -f compose.yaml -f compose.oracle.yaml logs -f app
+  docker compose -f compose.yaml -f compose.oracle.yaml logs -f caddy
+
+Wait for Caddy to obtain the certificate. Then verify:
+
+  curl -fsS https://stones.example.com/api/health
+
+Expected:
+
+  {"ok":true,"app":"seven-stones"}
+
+Open https://stones.example.com in a browser. Create a test account, play one
+ranked game, and confirm the wallet, history, and leaderboard update.
+
+The app listens on the VM's loopback only. Caddy reaches app:8787 over the
+private Compose network. Do not add a public 8787 mapping.
+
+
+8. GOOGLE OAUTH (OPTIONAL)
+--------------------------
+1. Google Cloud Console -> APIs & Services -> Credentials.
+2. Create an OAuth client of type "Web application".
+3. Authorized JavaScript origin: https://stones.example.com
+4. Set GOOGLE_CLIENT_ID in .env.
+5. Restart the app:
+
+   docker compose -f compose.yaml -f compose.oracle.yaml up -d app
+
+Google sign-in requires the public HTTPS origin to match exactly. There is no
+way to test it without a real client ID.
+
+
+9. BACKUPS
+----------
+The SQLite database lives in the Docker volume seven-stones-data at
+/app/data/league.sqlite. Stop the app before copying the database so the WAL is
+consistent:
+
+  docker compose -f compose.yaml down
+
+Then either copy the whole volume, or use a temporary container:
+
+  docker run --rm \
+    -v seven-stones-data:/data:ro \
+    -v "$PWD/backups:/backup" \
+    alpine sh -c 'tar czf /backup/seven-stones-$(date +%F-%H%M).tgz -C /data .'
+
+Start the app again:
+
+  docker compose -f compose.yaml -f compose.oracle.yaml up -d
+
+Copy backups off the VM. Test a restore on a separate host before trusting the
+backup.
+
+To restore, stop the stack, replace the contents of the volume, and start it
+again. Keep league.sqlite, league.sqlite-wal, and league.sqlite-shm together.
+
+Suggested retention: daily for 7 days, weekly for 4 weeks, and one monthly
+copy. Do not delete the live database while the app is running.
+
+
+10. UPDATES
+-----------
+From the project directory:
+
+  git pull            # or copy the new files
+  docker compose -f compose.yaml -f compose.oracle.yaml up -d --build
+
+The app keeps sessions and committed games in the volume across restarts.
+Pending NOVA turns are resumed on boot. Database schema changes are applied
+idempotently at startup.
+
+Check after every update:
+
+  curl -fsS https://stones.example.com/api/health
+  docker compose -f compose.yaml -f compose.oracle.yaml ps
+  docker compose -f compose.yaml -f compose.oracle.yaml logs --tail=100 app
+
+
+11. OPERATIONS
+--------------
+Logs:
+
+  docker compose -f compose.yaml -f compose.oracle.yaml logs --tail=200 app
+
+Restart:
+
+  docker compose -f compose.yaml -f compose.oracle.yaml restart app
+
+Stop:
+
+  docker compose -f compose.yaml -f compose.oracle.yaml down
+
+Start without rebuilding:
+
+  docker compose -f compose.yaml -f compose.oracle.yaml up -d
+
+Container health: GET /api/health returns {"ok":true,"app":"seven-stones"}.
+
+The process needs a single replica. Do not run multiple containers against the
+same SQLite file. For higher availability you would need to replace SQLite with
+a networked database first.
+
+
+12. TROUBLESHOOTING
+-------------------
+Certificate never issues:
+- DNS does not resolve to the VM.
+- Port 80 or 443 is blocked in the OCI security list or host firewall.
+- Another service is already listening on 80/443.
+- Check Caddy logs; rate limits from Let's Encrypt are possible after repeated
+  failed attempts.
+
+Site loads but login does not stick:
+- COOKIE_SECURE must be 1 only when the browser is using HTTPS.
+- Mixed HTTP/HTTPS access will not share a Secure cookie.
+- Check that the public origin matches the Google authorized origin.
+
+Database permission error:
+- Ensure the volume is mounted at /app/data and is writable by the container's
+  node user. The image creates /app/data with the correct owner; a manually
+  created bind mount may need: sudo chown -R 1000:1000 /path/to/data
+
+"Address already in use":
+- Another process is using 8787. Stop it or change PORT, and update compose.yaml
+  and the Caddy reverse_proxy target together.
+
+Low memory:
+- Use a larger shape or add swap. Node.js plus SQLite is light, but the OS and
+  Docker need headroom.
+
+Rebuild uses an old pnpm lock:
+- The image runs pnpm install --frozen-lockfile. Commit pnpm-lock.yaml whenever
+  dependencies change.
+
+
+13. HONEST LIMITS
+-----------------
+- This guide is not a hosted deployment. No public URL exists until you supply
+  an OCI account, domain, DNS, and credentials.
+- Google sign-in is optional and cannot be verified without a real client ID.
+- Chips are virtual. There are no purchases, prizes, withdrawals, or real-money
+  wagering.
+- No fake players, online counts, or champions are created. Empty periods stay
+  empty.

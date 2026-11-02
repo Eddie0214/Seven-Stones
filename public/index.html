@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1016" />
+    <meta
+      name="description"
+      content="Seven Stones — 15×15 freestyle Gomoku. Beat NOVA, build your daily score, and earn your seat at the leaderboard."
+    />
+    <title>Seven Stones · Fifteen by fifteen. One seat at the top.</title>
+    <link rel="stylesheet" href="/styles.css?v=1.0.0" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b1016'/%3E%3Ccircle cx='32' cy='32' r='20' fill='none' stroke='%23e7b45c' stroke-width='4'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23e7b45c'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">7</div>
+        <div>
+          <h1>Seven Stones</h1>
+          <p class="tagline">15×15 freestyle Gomoku</p>
+        </div>
+      </div>
+
+      <nav class="tabs" aria-label="Sections">
+        <button class="tab active" data-tab="play" type="button">Play</button>
+        <button class="tab" data-tab="leaderboard" type="button">Leaderboard</button>
+        <button class="tab" data-tab="history" type="button">History</button>
+        <button class="tab" data-tab="invitations" type="button">
+          Invitations <span id="inviteBadge" class="badge-dot" hidden>0</span>
+        </button>
+      </nav>
+
+      <button id="accountButton" class="account-button" type="button">
+        <span class="account-dot" aria-hidden="true"></span>
+        <span id="accountLabel">Sign in</span>
+      </button>
+    </header>
+
+    <main id="main">
+      <section class="tab-panel" data-panel="play" id="panel-play">
+        <div class="play-grid">
+          <div class="board-card">
+            <div class="board-top">
+              <div>
+                <span id="gameBadge" class="badge">READY</span>
+                <h2 id="gameTitle">Your move</h2>
+                <p id="gameSub" class="micro">Five in a row wins. Black moves first.</p>
+              </div>
+              <div id="turnClock" class="clock" hidden>1:30</div>
+            </div>
+
+            <div id="gameBanner" class="banner" hidden></div>
+
+            <div class="board-wrap" id="boardWrap">
+              <div class="board-frame" id="boardFrame">
+                <div class="board-labels-x" id="labelsX" aria-hidden="true"></div>
+                <div class="board-body">
+                  <div class="board-labels-y" id="labelsY" aria-hidden="true"></div>
+                  <div
+                    id="board"
+                    class="board"
+                    role="grid"
+                    aria-label="15 by 15 Gomoku board"
+                    aria-rowcount="15"
+                    aria-colcount="15"
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="board-controls">
+              <button id="largerBoardBtn" class="ghost small" type="button" aria-pressed="false">
+                Larger board: off
+              </button>
+              <button id="resignBtn" class="danger small" type="button" hidden>Resign</button>
+              <span class="board-hint">Coordinates A–O, 1–15 · No forbidden moves</span>
+            </div>
+          </div>
+
+          <aside class="side-stack">
+            <div class="card wallet-card">
+              <div class="wallet-row">
+                <div>
+                  <p class="eyebrow">Available chips</p>
+                  <strong id="walletValue" class="wallet-value">300</strong>
+                </div>
+                <div class="wallet-meta">
+                  <span>AI net today</span>
+                  <strong id="netValue">0</strong>
+                  <span>Ranked games</span>
+                  <strong id="usedValue">0</strong>
+                </div>
+              </div>
+              <p class="micro">Daily baseline resets to 300 at 00:00 UTC. Active stakes are reserved.</p>
+            </div>
+
+            <div class="card ranked-card">
+              <h3>Ranked vs NOVA</h3>
+              <p class="micro">Server-verified results only. AI games count toward the leaderboard.</p>
+              <div id="stakeList" class="stake-list" role="group" aria-label="Choose a stake"></div>
+              <button id="startAiBtn" class="primary wide" type="button">Start ranked game</button>
+              <p id="rankedHint" class="micro"></p>
+            </div>
+
+            <div id="progressCard" class="card progress-card">
+              <p class="eyebrow">Road to 1,000.</p>
+              <h3>Beat NOVA. Build your score. Earn your seat.</h3>
+              <div class="progress-track" aria-hidden="true">
+                <div id="inviteProgressBar" class="progress-fill"></div>
+              </div>
+              <p id="inviteProgressText" class="progress-text">300 / 1,000 points · 700 to go</p>
+              <p id="inviteUnlockNote" class="micro"></p>
+            </div>
+
+            <div class="card practice-card">
+              <h3>Practice</h3>
+              <p class="micro">
+                No sign-in. Scores and unlocks stay on this device and never enter the public
+                leaderboard.
+              </p>
+              <div class="segmented" id="practiceLevel" role="group" aria-label="Practice difficulty">
+                <button data-level="standard" type="button">Standard</button>
+                <button data-level="advanced" type="button" class="active">Advanced</button>
+              </div>
+              <button id="practiceBtn" class="ghost wide" type="button">Start practice</button>
+              <p id="practiceRecord" class="micro"></p>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="leaderboard" id="panel-leaderboard" hidden>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Seven days. One champion.</p>
+            <h2>Leaderboard</h2>
+            <p id="seasonLine" class="micro"></p>
+          </div>
+          <div class="segmented" id="leaderboardMode" role="group" aria-label="Leaderboard period">
+            <button data-mode="today" type="button" class="active">Today</button>
+            <button data-mode="season" type="button">Season</button>
+          </div>
+        </div>
+
+        <div class="leader-layout">
+          <div class="card">
+            <div id="leaderboardList" class="leader-list"></div>
+          </div>
+          <aside class="side-stack">
+            <div class="card">
+              <h3>Yesterday's top three</h3>
+              <div id="dailyAnnouncement" class="archive"></div>
+            </div>
+            <div class="card">
+              <h3>Season champions</h3>
+              <div id="seasonAnnouncements" class="archive"></div>
+            </div>
+            <div class="card">
+              <h3>Challenge rules</h3>
+              <p class="micro">
+                Reach 1,000 points in a single UTC day to unlock invitations permanently. You can
+                then challenge a top-three player from today or this season. Both players must be
+                online, free, and able to cover the same stake.
+              </p>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="history" id="panel-history" hidden>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Every result, in order.</p>
+            <h2>History</h2>
+            <p class="micro">Last 20 finished games on this account, plus local practice runs.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div id="historyList" class="history-list"></div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="invitations" id="panel-invitations" hidden>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Your next rival awaits.</p>
+            <h2>Invitations</h2>
+            <p class="micro">Invitations expire at the next 00:00 UTC. Nothing is staked until both players accept.</p>
+          </div>
+        </div>
+
+        <div class="invite-grid">
+          <div class="card">
+            <h3>Received</h3>
+            <div id="receivedInvites" class="invite-list"></div>
+          </div>
+          <div class="card">
+            <h3>Sent</h3>
+            <div id="sentInvites" class="invite-list"></div>
+          </div>
+        </div>
+
+        <div id="inviteLockedNote" class="card locked-note" hidden>
+          <p class="eyebrow">LEADERBOARD INVITATIONS LOCKED</p>
+          <h3>Your seat is waiting.</h3>
+          <p class="micro">
+            Reach 1,000 points in one UTC day by beating NOVA. Invitations are sent from the
+            Leaderboard to a top-three player.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        15×15 freestyle Gomoku · Virtual chips only. No purchases, cash prizes, or real-money
+        wagering.
+      </p>
+      <p class="micro">
+        NOVA is a computer opponent. Leaderboards include server-verified ranked AI games only.
+        Practice and human duels do not count.
+      </p>
+    </footer>
+
+    <dialog id="authDialog" class="dialog">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">Seven Stones account</p>
+          <h2 id="authTitle">Sign in</h2>
+        </div>
+        <button class="icon-button" type="button" data-close="authDialog" aria-label="Close">×</button>
+      </div>
+
+      <div class="segmented wide" id="authMode" role="group" aria-label="Account action">
+        <button data-auth="login" type="button" class="active">Sign in</button>
+        <button data-auth="register" type="button">Create account</button>
+      </div>
+
+      <form id="authForm" class="form">
+        <label for="authName">Player name</label>
+        <input id="authName" name="name" autocomplete="username" minlength="3" maxlength="18" required />
+        <label for="authPassword">Password</label>
+        <input
+          id="authPassword"
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          minlength="8"
+          maxlength="200"
+          required
+        />
+        <p class="micro" id="authHint">3–18 characters. Letters, numbers, spaces, dots, dashes, underscores.</p>
+        <button id="authSubmit" class="primary wide" type="submit">Sign in</button>
+      </form>
+
+      <div class="google-area">
+        <div class="divider"><span>or</span></div>
+        <div id="googleButton" class="google-button"></div>
+        <p id="googleNote" class="micro"></p>
+      </div>
+
+      <p id="authMessage" class="form-message" role="alert" hidden></p>
+
+      <button id="logoutBtn" class="ghost wide" type="button" hidden>Sign out</button>
+    </dialog>
+
+    <dialog id="challengeDialog" class="dialog">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">Human duel</p>
+          <h2>Challenge <span id="challengeName">player</span></h2>
+        </div>
+        <button class="icon-button" type="button" data-close="challengeDialog" aria-label="Close">×</button>
+      </div>
+      <p class="micro">
+        Choose a stake you can cover. The invitation stays open until 00:00 UTC. Chips are only
+        reserved when both players accept.
+      </p>
+      <div id="challengeStakes" class="stake-list" role="group" aria-label="Challenge stake"></div>
+      <button id="challengeSendBtn" class="primary wide" type="button">Send invitation</button>
+      <p id="challengeMessage" class="form-message" role="alert" hidden></p>
+    </dialog>
+
+    <div id="toasts" class="toasts" aria-live="polite" aria-atomic="false"></div>
+
+    <script src="/rules.js?v=1.0.0" defer></script>
+    <script src="/engine.js?v=1.0.0" defer></script>
+    <script src="/app.js?v=1.0.0" defer></script>
+  </body>
+</html>

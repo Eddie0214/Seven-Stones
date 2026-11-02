@@ -1,0 +1,20 @@
+{
+  "name": "seven-stones",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Seven Stones — 15x15 freestyle Gomoku with ranked NOVA AI and human duels.",
+  "main": "server.cjs",
+  "type": "commonjs",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.cjs",
+    "dev": "node --env-file-if-exists=.env server.cjs",
+    "test": "node --test test/league.test.cjs"
+  },
+  "dependencies": {
+    "google-auth-library": "11.3.2"
+  }
+}
